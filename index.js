@@ -1,7 +1,11 @@
 //http://stackoverflow.com/questions/5728558/get-the-dom-path-of-the-clicked-a/16742828#16742828
+
+// this is just a dfs, you might do this recursively and i'll easier to understand
 var getDomPath = function(el) {
   var stack = [];
-  while ( el.parentNode != null ) {
+  
+  // while (expr) not while ( expr ) innecesary spaces
+  while (el.parentNode != null) {
     var sibCount = 0;
     var sibIndex = 0;
     for ( var i = 0; i < el.parentNode.childNodes.length; i++ ) {
@@ -30,7 +34,10 @@ var getDomPath = function(el) {
   return stack.slice(1); // removes the html element
 };
 //
-
+// this is not safe, find a better way to do it, you just need to 
+// generate the path, no need to use document.querySelectorAll as a
+// string and then eval
+// you can do something like document.querySelectorAll(getPath(pathArray))
 //not sure about the name
 //transformPath
 //transformToJSPath
@@ -57,14 +64,17 @@ var getEvalPath = function(pathArray) {
   }
   return newPath;
 };
-
+// you can do this inline, 
 var viewUtils = {
+  
+  // sidefects on a parameter, bad pattern
   styleElem: function(elem, prop, value) {
     elem.style[prop] = value;
   }
 };
 
 var view = {
+  // const should be outside the view, is not related to this
   CTRL_KEY: 9,
   overlay: null,
 
@@ -144,6 +154,7 @@ var store = {
     if (store.lastElemPath) {
       store.db[keyCode] = store.lastElemPath;
       store.lastElemPath = null;
+      // why do the store references the view ? 
       view.hideOverlay();
     } else if (keyCode in store.db) {
       eval(store.db[keyCode]).click();
@@ -155,8 +166,6 @@ var store = {
   }
 };
 
-var init = function() {
-  view.init();
-};
+var init = view.init
 
 init();
