@@ -1,71 +1,67 @@
-//http://stackoverflow.com/questions/5728558/get-the-dom-path-of-the-clicked-a/16742828#16742828
-var getDomPath = function(el) {
-  var stack = [];
-  while ( el.parentNode != null ) {
-    var sibCount = 0;
-    var sibIndex = 0;
-    for ( var i = 0; i < el.parentNode.childNodes.length; i++ ) {
-      var sib = el.parentNode.childNodes[i];
-      if ( sib.nodeName == el.nodeName ) {
-        if ( sib === el ) {
-          sibIndex = sibCount;
-        }
-        sibCount++;
-      }
-    }
-    if ( el.hasAttribute('id') && el.id != '' ) {
-      stack.unshift(el.nodeName.toLowerCase() + '#' + el.id);
-    } else if ( sibCount > 1 ) {
-        //original
-        //stack.unshift(el.nodeName.toLowerCase() + ':eq(' + sibIndex + ')');
+var argsToArray = function(args) {
+  return args = Array.prototype.slice.call(args);
+};
 
-        //modified to get a simple structure
-        stack.unshift(el.nodeName.toLowerCase() + ':' + sibIndex);
+var partial = function(fn) {
+  var pastArgs = argsToArray(arguments).slice(1);
+  return function() {
+    var newArgs = argsToArray(arguments);
+    return fn.apply(null, pastArgs.concat(newArgs));
+  }
+};
+
+var hasId = function(elem) {
+  return elem.hasAttribute('id') && elem.id !== '';
+};
+
+var sameNodeName = function(nodeA, nodeB) {
+  return nodeA.nodeName === nodeB.nodeName;
+};
+
+var isRootNode = function(elem) {
+  return elem.nodeName.toLowerCase() === 'html';
+};
+
+var getSameTagChildNodes = function(children, elem) {
+  return [].filter.call(children, partial(sameNodeName, elem));
+};
+
+var getDomPath = function(actualNode) {
+  if (isRootNode(actualNode)) {
+    return [];
+  }
+
+  var nodeData = {
+    tag: actualNode.nodeName.toLowerCase()
+  };
+
+  if (hasId(actualNode)) {
+    nodeData.id = actualNode.id;
+  } else {
+    var children = getSameTagChildNodes(actualNode.parentNode.childNodes, actualNode);
+
+    if (children.length === 1) {
+      nodeData.n = 0;
     } else {
-      stack.unshift(el.nodeName.toLowerCase());
+      nodeData.n = children.indexOf(actualNode);
     }
-    el = el.parentNode;
   }
-
-  return stack.slice(1); // removes the html element
+  return getDomPath(actualNode.parentNode).concat(nodeData);
 };
-//
 
-//not sure about the name
-//transformPath
-//transformToJSPath
-//simplifyPath
-var getEvalPath = function(pathArray) {
-  var newPath = 'document.querySelectorAll("';
-  for (var i = 0, len = pathArray.length; i < len ; i++) {
-    if (i !== 0) {
-      newPath += ' > ';
-    }
-    if (pathArray[i].indexOf(':') !== -1) {
-      var data = pathArray[i].split(':');
-      newPath += data[0] + '")[' + data[1] + ']';
-      if (i + 1 < len) {
-        newPath += '.querySelectorAll(":scope ';
-      }
+var getDomElemFrom = function(path) {
+  return path.reduce(function(elem, nodeData) {
+    if (nodeData.id) {
+      return elem.querySelector(nodeData.tag + '#' + nodeData.id);
     } else {
-       newPath += pathArray[i];
+      return elem.querySelectorAll(nodeData.tag)[nodeData.n];
     }
-  }
-
-  if (newPath.slice(-1) !== ']') {
-    newPath += '")[0]';
-  }
-  return newPath;
+  }, document);
 };
 
-var viewUtils = {
-  styleElem: function(elem, prop, value) {
-    elem.style[prop] = value;
-  }
-};
+CTRL_KEY = 9;
 
 var view = {
-  CTRL_KEY: 9,
   overlay: null,
 
   init: function() {
@@ -87,7 +83,7 @@ var view = {
     };
 
     Object.keys(styles).forEach(function(k) {
-      view.styleOverlay(k, styles[k]);
+      overlay.style[k] = styles[k];
     });
 
     view.initListeners();
@@ -95,9 +91,11 @@ var view = {
 
   initListeners: function() {
     document.addEventListener('keydown', function(evt) {
+      evt.stopPropagation();
+      evt.preventDefault();
       var keyCode = evt.keyCode;
 
-      if (keyCode === view.CTRL_KEY) {
+      if (keyCode === CTRL_KEY) {
         view.enableClickOnOverlay();
       } else {
         store.handleKey(keyCode);
@@ -118,10 +116,6 @@ var view = {
     view.overlay.addEventListener('click', listenClick);
   },
 
-  styleOverlay: function(prop, value) {
-    viewUtils.styleElem(view.overlay, prop, value);
-  },
-
   showOverlay: function() {
     view.setVisibility('')
   },
@@ -131,7 +125,7 @@ var view = {
   },
 
   setVisibility: function(newVisibility) {
-    view.styleOverlay('visibility', newVisibility);
+    view.overlay.style['visibility'] = newVisibility;
   }
 }
 
@@ -144,19 +138,19 @@ var store = {
     if (store.lastElemPath) {
       store.db[keyCode] = store.lastElemPath;
       store.lastElemPath = null;
+      // why do the store references the view ? 
       view.hideOverlay();
     } else if (keyCode in store.db) {
-      eval(store.db[keyCode]).click();
+      var path = JSON.parse(store.db[keyCode]);
+      getDomElemFrom(path).click();
     }
   },
 
   savePathFromElement: function(elem) {
-    store.lastElemPath = getEvalPath(getDomPath(elem));
+    store.lastElemPath = JSON.stringify(getDomPath(elem));
   }
 };
 
-var init = function() {
-  view.init();
-};
+var init = view.init
 
 init();
